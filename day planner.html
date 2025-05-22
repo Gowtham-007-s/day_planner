@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Weekly Day Planner</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #f4f6f8;
+      margin: 0;
+      padding: 0;
+    }
+    header {
+      background: #4a90e2;
+      color: white;
+      padding: 20px;
+      text-align: center;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 30px auto;
+      padding: 20px;
+    }
+    .week {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 15px;
+    }
+    .day-box {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      padding: 15px;
+    }
+    .day-box h3 {
+      text-align: center;
+      color: #333;
+    }
+    .task {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      border: 1px solid #ddd;
+      padding: 8px;
+      border-radius: 6px;
+    }
+    .task input[type="text"] {
+      flex: 1;
+      padding: 5px;
+      margin-right: 5px;
+      border: none;
+      background: #f9f9f9;
+      border-radius: 4px;
+    }
+    .task input[type="time"] {
+      margin-right: 5px;
+    }
+    .task button {
+      padding: 5px 10px;
+      background: #4a90e2;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .task button:hover {
+      background: #3a78c2;
+    }
+
+    .addbtn{
+      background-color: #3a78c2;
+      color:#ddd;
+      padding: 5px;
+      border-style: none;
+      transform: scale(1.2);
+    }
+
+    .addbtn:hover{
+      opacity: 70%;
+      transition: all;
+    }
+
+  </style>
+</head>
+<body>
+  <header>
+    <h1>📅 Weekly Day Planner</h1>
+    <p>Organize your entire week with reminders</p>
+  </header>
+  <div class="container">
+    <div class="week" id="weekContainer"></div>
+  </div>
+
+  <audio id="reminderSound" src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg" preload="auto"></audio>
+
+  <script>
+    const weekContainer = document.getElementById('weekContainer');
+    const daysOfWeek = [ 'Saturday', 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+
+    function getCurrentWeekDates() {
+      const today = new Date();
+      const firstDay = today.getDate() - today.getDay();
+      const dates = [];
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(today.getFullYear(), today.getMonth(), firstDay + i);
+        dates.push({
+          label: daysOfWeek[i],
+          date: date.toISOString().split('T')[0]
+        });
+      }
+      return dates;
+    }
+
+    function createDayBox(day) {
+      const box = document.createElement('div');
+      box.className = 'day-box';
+      box.innerHTML = `<h3>${day.label}<br><small>${day.date}</small></h3><div id="tasks-${day.date}"></div><button class="addbtn" onclick="addTask('${day.date}')">Add Task</button>`;
+      return box;
+    }
+
+    function addTask(date, taskText = '', taskTime = '') {
+      const container = document.getElementById(`tasks-${date}`);
+      const taskId = `${date}-${Date.now()}`;
+      const task = document.createElement('div');
+      task.className = 'task';
+      task.innerHTML = `
+        <input type="text" placeholder="Task" value="${taskText}" id="desc-${taskId}">
+        <input type="time" value="${taskTime}" id="time-${taskId}">
+        <button class="savebtn"onclick="saveTask('${taskId}', '${date}')">💾</button>
+        <button onclick="deleteTask(this, '${taskId}')">🗑️</button>
+      `;
+      container.appendChild(task);
+    }
+
+    function saveTask(id, date) {
+      const desc = document.getElementById(`desc-${id}`).value;
+      const time = document.getElementById(`time-${id}`).value;
+      const savebtn = document.querySelector(".savebtn");
+      savebtn.addEventListener('click',(e)=>{
+        alert("Saved Successfully");
+      })
+      if (!desc || !time) return alert('Fill out both task and time');
+      localStorage.setItem(id, JSON.stringify({ desc, time, date }));
+    }
+
+    function deleteTask(button, id) {
+      const task = button.parentElement;
+      task.remove();
+      localStorage.removeItem(id);
+    }
+
+    function loadTasks() {
+      Object.keys(localStorage).forEach(key => {
+        try {
+          const task = JSON.parse(localStorage.getItem(key));
+          if (task && task.date && task.desc && task.time) {
+            addTask(task.date, task.desc, task.time);
+          }
+        } catch (e) {
+          console.warn(`Skipping invalid task: ${key}`);
+        }
+      });
+    }
+
+    function checkReminders() {
+      const now = new Date();
+      const currentTime = now.toTimeString().substring(0, 5);
+      const currentDate = now.toISOString().split('T')[0];
+      const sound = document.getElementById('reminderSound');
+      Object.keys(localStorage).forEach(key => {
+        try {
+          const task = JSON.parse(localStorage.getItem(key));
+          if (task && task.time === currentTime && task.date === currentDate && Notification.permission === 'granted') {
+            new Notification(`⏰ Reminder: ${task.desc}`);
+            sound.play();
+          }
+        } catch (e) {
+          console.warn(`Invalid task format for key ${key}`);
+        }
+      });
+    }
+
+    if (Notification.permission !== 'granted') {
+      Notification.requestPermission();
+    }
+
+    const weekDates = getCurrentWeekDates();
+    weekDates.forEach(day => {
+      const box = createDayBox(day);
+      weekContainer.appendChild(box);
+    });
+
+    loadTasks();
+    setInterval(checkReminders, 60000);
+  </script>
+</body>
+</html>
